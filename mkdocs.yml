@@ -1,0 +1,53 @@
+site_name: CloudDrive 個人筆記庫
+site_url: https://alfredshen01.github.io/CloudDrive-Personal-Notes/
+repo_url: https://github.com/alfredshen01/CloudDrive-Personal-Notes
+repo_name: CloudDrive-Personal-Notes
+
+theme:
+  name: material
+  language: zh-TW
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: 切換深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: 切換淺色模式
+  features:
+    - navigation.expand
+    - navigation.top
+    - toc.follow
+    - search.highlight
+
+nav:
+  - 首頁: index.md
+  - 00 目標與進度:
+      - 目標總覽: 00-目標與進度/目標總覽.md
+      - 每週概述: 00-目標與進度/每週概述.md
+      - roadmap 參照: 00-目標與進度/roadmap-參照.md
+  - 01 日誌:
+      - 2026-05 前置期 全端基礎: 01-日誌/2026-05-前置期-全端基礎.md
+      - 2026-06 前置期 FinalProject: 01-日誌/2026-06-前置期-FinalProject.md
+      - W1 0616~0622: 01-日誌/W1-0616~0622.md
+      - W2 0623~0629: 01-日誌/W2-0623~0629.md
+      - W3 0630~0706: 01-日誌/W3-0630~0706.md
+      - W4 0707~0713: 01-日誌/W4-0707~0713.md
+      - W5 0714~0720: 01-日誌/W5-0714~0720.md
+  - 02 筆記 harness:
+      - harness 筆記: 02-筆記-harness/harness筆記.md
+      - eval 系統速覽: 02-筆記-harness/eval系統速覽.md
+      - V0.2 審查發現與測試現況: 02-筆記-harness/V02審查發現與測試現況.md
+      - openai-oauth-problem: 02-筆記-harness/openai-oauth-problem.md
+  - 03 筆記 前後端:
+      - 後端概念: 03-筆記-前後端/後端概念.md
+      - 前端概念: 03-筆記-前後端/前端概念.md
+      - 開發筆記精選: 03-筆記-前後端/開發筆記精選.md
+  - 04 筆記 部署維運:
+      - 部署與環境: 04-筆記-部署維運/部署與環境.md
+  - 99 報告:
+      - harness 架構報告: 99-報告/harness架構報告.md
+      - 測試系統報告: 99-報告/測試系統報告.md
