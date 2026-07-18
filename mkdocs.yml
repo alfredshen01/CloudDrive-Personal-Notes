@@ -26,9 +26,10 @@ theme:
 
 plugins:
   - search:
-      lang:
-        - en
-        - zh
+      lang: en
+      separator: '[\s​　\-、。，．？！；：:=/()（）「」*,;!?"]+|\.(?!\d)|(?=[一-鿿])'
+      pipeline:
+        - stopWordFilter
 
 nav:
   - 首頁: index.md
