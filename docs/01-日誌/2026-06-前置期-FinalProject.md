@@ -1,4 +1,4 @@
-# Final_Project 開發日誌
+# 前置期日誌（2026-06）：Final_Project 改版
 
 彩色轉黑白圖片轉換網站(由原「日曆」專案改版而來),規劃為可擴充的多功能圖片處理平台。
 
@@ -32,7 +32,7 @@
 - 上傳介面精簡成矮橫條
 - 清理沒在用的死檔 `initdb/`
 
-### 遇到的問題與解決
+### 遇到的問題
 
 **問題 1:沿用舊模板改版,擔心資料庫會變亂**
 - 緣由:直接拿「日曆」專案的模板改成圖片網站,怕有殘留的東西沒清乾淨。
@@ -67,24 +67,11 @@
 - 原因:第一版只改了內距(padding),但 antd 的 Dragger 元件 `.ant-upload-drag` 預設帶 `height: 100%`,被它撐高;而且調整 flex 時下錯層級(真正包內容的是 `.ant-upload-drag-container` 不是 `.ant-upload-btn`),所以圖示和文字也沒排成橫排。
 - 解決方法:對 `.ant-upload.ant-upload-drag` 設 `height: auto !important` 覆蓋預設,並把 flex 規則下到 `.ant-upload-drag-container`,做成矮橫條。
 
-### 學到的概念
-- **HTTP header 只能 latin-1 編碼**:要放非 ASCII(如中文)檔名,用 RFC 5987 的 `filename*=UTF-8''<百分比編碼>`,並保留 ASCII 的 `filename` 當 fallback。
-- **EXIF Orientation**:照片的方向常存在 EXIF 標記裡而非像素本身,用 `ImageOps.exif_transpose()` 才能轉正。
-- **同源 vs 跨源 / CORS**:同源請求瀏覽器不檢查 CORS;跨源(連 www 與非 www 都算)才會觸發 preflight。要讓前端 JS 讀自訂回應 header(如 `Content-Disposition`、`X-File-Id`),後端要設 `expose_headers`。
-- **無損 vs 有損**:PNG 無損但檔案大,JPEG 有損但小很多;照片場景用 JPEG 體感差異極小。效能瓶頸要先量測(運算 vs 網路)再決定優化方向。
-- **alembic 鐵則**:已套用過的 migration 永遠不要回頭改或刪,要往前加新的,否則 revision 鏈會壞掉。
-- **外鍵與 CASCADE**:被引用的列不能直接刪;`ondelete=CASCADE` 可讓父列刪除時自動清掉子列。
-- **nginx `client_max_body_size`**:預設只有 1MB,大檔上傳會被 nginx 在到達後端前就擋下(413)。
-- **Docker volume**:讓容器重建後檔案仍保留的持久化機制。
-
-### 今日小結
-把專案從日曆成功改版成可擴充的圖片處理平台,並學到一個重要的除錯心法:**錯誤訊息會騙人**——「連線失敗」其實是中文檔名引發的 500,要靠分層排查(部署→CORS→DevTools 狀態碼)才能找到真因。
-
 ### 待釐清
 - `events` 閒置表要不要正式用 migration 移除(目前留著無害)。
 - 檔案目前存在 Droplet volume,若日後量大或要防伺服器掛掉,再評估改用 DigitalOcean Spaces(S3)。
 
-### 下次待辦
+### 待辦
 - [ ] 清掉除錯時建立的測試帳號(`_tmptest_*`、`_verify_*`、`_filetest_*`、`_exiftest_*`、`_uitest_*`):`DELETE FROM users WHERE username LIKE '\_%';`
 - [ ] 規劃第二個圖片處理功能(例如縮圖或濾鏡),驗證分類系統可順利擴充
 - [ ] (可選)新增一支 migration 移除 `events` 表
