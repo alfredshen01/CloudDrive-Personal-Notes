@@ -39,4 +39,4 @@ status == "pending_approval"           # 是否標記為需確認
 - **邊界**：eval 擁有「案例／驅動／判定／評分」；驅動但不擁有「助理、真模型、DB、考官」;介面是外部 HTTP——如同外部考官：出卷、監考、改卷,不擁有考生。
 - **不在範圍**:不訓練模型、不跨模型（綁定 gemma4:26b）、不代表真實使用分佈、非負載/安全測試。
 - **限制**：部分 sweep 樣本 5–10（通過率為趨勢非精確值）；考官主觀故僅輔助。
-- 原始數據索引：`backend/eval/out/`（各 temp_sweep 檔）與 cloud_drive `doc/tasks/assistant-eval.md`（E1–E8）。
+- 原始數據索引：`backend/eval/out/`（各 temp_sweep 檔）與 cloud_drive 的 [doc/tasks/assistant-eval.md](https://github.com/billwu101/CloudDrive/blob/main/doc/tasks/assistant-eval.md)（E1–E8）。

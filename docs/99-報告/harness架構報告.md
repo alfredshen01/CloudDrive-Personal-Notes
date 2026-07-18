@@ -1,8 +1,8 @@
 # CloudDrive In-App AI Assistant：Agent Harness 架構設計
 
-> 報告文件（受眾：指導老師）。本檔為根目錄工作稿,不納入版本控制。
-> 底稿與細節出處：`doc/harness-architecture.md`、`doc/detailed-design.md §9`、`doc/decisions.md`。
-> 圖以【圖 N】佔位標示,實際圖檔另行產出（見文末「圖表清單」）。
+> 報告文件（受眾：指導老師）。本頁為 Markdown 版,正式版以 docx 為準;測試與數據詳見 [測試系統報告](測試系統報告.md)。
+> 底稿與細節出處（cloud_drive 共用 repo,內文的 `doc/*` 路徑皆指該 repo）：[harness-architecture.md](https://github.com/billwu101/CloudDrive/blob/main/doc/harness-architecture.md)、[detailed-design.md](https://github.com/billwu101/CloudDrive/blob/main/doc/detailed-design.md) §9、[decisions.md](https://github.com/billwu101/CloudDrive/blob/main/doc/decisions.md)。
+> 圖以【圖 N】佔位標示（部分已以 Mermaid 呈現於網站版,正式圖檔另行產出,見文末「圖表清單」）。
 
 ---
 
@@ -25,9 +25,31 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
 本專案的 harness 對應到 agent 系統的六個通用核心元件（E/T/C/S/L/V）,並以九個實作模組落地。
 
 【圖 1：Harness Runtime 六元件架構圖】
-> 說明：以分層方塊呈現 Workflow Pipeline 在最上、六元件 Runtime 在中、V（評測介面）
-> 畫在**右側**（箭頭指向系統,表示它是離線工具、不在請求路徑上）,最下為 Service 層 →
-> DB/Storage。此圖是全報告的骨幹圖。ASCII 原型見 `doc/harness-architecture.md §5`。
+
+```mermaid
+flowchart TB
+  U["使用者自然語言需求"] --> P
+  subgraph P["Workflow Pipeline（要做什麼）"]
+    direction LR
+    p1["需求解析"] --> p2["規劃"] --> p3["技能檢查"] --> p4["權限/安全"] --> p5["確認"] --> p6["執行"] --> p7["記錄"]
+  end
+  P --> R
+  subgraph R["Agent Harness Runtime（怎麼可靠地跑）"]
+    direction TB
+    E["E Execution Loop<br/>while loop・workflow executor・<br/>bounded sub-agent・model interface"]
+    T["T Tool / Skill Registry<br/>內建・自建・現場生成技能"]
+    C["C Context Manager<br/>裁切・prompt 組裝・歷史回放"]
+    S["S State Store<br/>sessions・skills・workflows"]
+    L["L Lifecycle Hooks 治理層<br/>permissions・codeguard・sandbox・隱私閘"]
+  end
+  V["V Evaluation Interface<br/>離線 eval harness（不在請求路徑上）"] -. "評測請求" .-> R
+  R --> SV["CloudDrive Service Layer（DEC-017）"]
+  SV --> DB[("PostgreSQL + Storage")]
+```
+
+> 說明：Workflow Pipeline 在最上、六元件 Runtime 在中、V（評測介面）
+> 畫在**旁側**（虛線箭頭指向系統,表示它是離線工具、不在請求路徑上）,最下為 Service 層 →
+> DB/Storage。此圖是全報告的骨幹圖。ASCII 原型見 cloud_drive 的 `doc/harness-architecture.md §5`。
 
 | 元件 | 職責 | 主要實作檔 |
 |---|---|---|
@@ -36,7 +58,7 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
 | **C** Context Manager | token 預算、裁切、工具輸出瘦身、技能清單注入、system prompt 組裝、**對話歷史回放** | `context.py`、`planner.py`、`memory.py` |
 | **S** State Store | session/messages/skills/workflows 持久化,全依 `user_id` 隔離 | `repository.py` + migrations |
 | **L** Lifecycle Hooks | 治理層攔截點;強制執行權限分層、核可、沙箱、稽核、**外送隱私閘** | `hooks.py`、`permissions.py`、`codeguard.py`、`sandbox.py` |
-| **V** Evaluation Interface | 離線開發者工具：確定性斷言 + LLM judge + baseline 回歸,API/browser/exec 三模式 | `backend/eval/`（獨立文件 B 詳述） |
+| **V** Evaluation Interface | 離線開發者工具：確定性斷言 + LLM judge + baseline 回歸,API/browser/exec 三模式 | `backend/eval/`（詳見 [測試系統報告](測試系統報告.md)） |
 
 **呈現時的三個注意事項（答辯用）**：
 1. **V 不在請求路徑上**——它從外部打 `/assistant/chat` 評測,圖上畫在旁側。
@@ -49,9 +71,24 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
 助理處理一則自然語言請求的完整流程:
 
 【圖 2：Workflow 執行管線流程圖】
-> 說明：垂直流程圖，節點為「需求解析 → 規劃(結構化輸出) → 技能檢查(缺則觸發生成子流程) →
-> 權限/安全檢查 → 顯示計畫 → 使用者確認?(是/否分支) → 執行 → 記錄」。確認節點分兩路：
-> 唯讀自動執行(fast-path)、寫入/破壞性走人工確認。對應 `doc/detailed-design.md §9.3`。
+
+```mermaid
+flowchart TD
+  A["需求解析"] --> B["規劃（結構化輸出,技能名 enum）"]
+  B --> C{"技能齊全?"}
+  C -- "缺技能" --> G["技能生成子流程（圖 3）"] --> D
+  C -- "齊" --> D["權限 / 安全檢查"]
+  D --> E["顯示計畫"]
+  E --> F{"權限層級"}
+  F -- "唯讀 fast-path" --> X["自動執行"]
+  F -- "寫入 / 破壞性" --> Y{"使用者確認"}
+  Y -- "同意" --> X
+  Y -- "拒絕" --> Z["取消（計畫留存,不執行）"]
+  X --> W["記錄：workflow run＋activity log"]
+```
+
+> 說明：確認節點分兩路：唯讀自動執行(fast-path)、寫入/破壞性走人工確認。
+> 對應 cloud_drive 的 `doc/detailed-design.md §9.3`。
 
 關鍵設計:
 - **結構化輸出（DEC-032）**：規劃階段用 json_schema grammar 約束,技能名以 enum 枚舉 →
@@ -86,7 +123,7 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
   （0/4 幻覺 vs assistant 文字 4/4）→ 決策依據,零 migration。
 - **確認執行寫回**：`/confirm` 端點原不寫歷史 → 修復為執行後把結果摘要寫回 session。
 - **限制（誠實）**：滑動視窗（~6 輪）、摘要每步 200 字截斷、單 session、靠最近非相關。
-  多輪 eval 的 recall 案例 0/5 即揭露「摘要保真」缺口（詳見文件 B）。
+  多輪 eval 的 recall 案例 0/5 即揭露「摘要保真」缺口（詳見 [測試系統報告](測試系統報告.md) §4）。
 
 ## 6. 技能生成與治理（自我撰寫技能）
 
@@ -102,7 +139,7 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
 
 ## 7. 設計原則沉澱（決策鏈）
 
-本專案的可靠性來自一連串**資料驅動的決策**,每個都有根因與驗證（文件 B 詳述數據）:
+本專案的可靠性來自一連串**資料驅動的決策**,每個都有根因與驗證（[測試系統報告](測試系統報告.md) 詳述數據）:
 
 | 決策 | 原則 |
 |---|---|
@@ -136,7 +173,7 @@ CloudDrive 是一套自架雲端硬碟,內嵌一個**在地運行（本機 gemma
 本 harness 對應 agent 系統六核心元件的通用框架;本專案的特色貢獻在於
 **「本地小模型 + 機制化可靠性」**——用 grammar/num_predict/thinking 配置等機制,
 把一個 26B 本地模型馴服到可用的可靠度,而非依賴更大的雲端模型。
-（文獻筆記見 `doc/harness-architecture.md §6`。）
+（文獻筆記見 [harness筆記](../02-筆記-harness/harness筆記.md) 第一部 §6。）
 
 ---
 

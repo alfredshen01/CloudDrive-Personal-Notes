@@ -7,7 +7,7 @@
 
 ## 1. 背景
 
-專案 AI 助理預設使用本機 Ollama(免費、自架)。當本機模型連續失敗、且使用者自行設定了憑證時,會升級到使用者自己的 GPT-5.5。升級有兩條路徑:
+專案 AI 助理預設使用本機 Ollama(免費、自架);使用者可為每則訊息自選模型來源——本機或自建的具名外部連線(撰文當時的設計是「本機連續失敗自動升級外部」,其後由手動選擇取代,演進見 [harness筆記](harness筆記.md) 第一部 §3)。外部連線走使用者自己的 GPT-5.5,有兩條路徑:
 
 - **路徑 A:Codex 訂閱**(`provider=codex`, `auth_type=oauth_token`)— 用 ChatGPT 訂閱額度,憑證是 `codex login` 產生的 `auth.json`。對應 `app/external_model/codex_client.py`。
 - **路徑 B:OpenAI API key**(`provider=openai`, `auth_type=api_key`)— 按 token 計費,憑證是 `sk-...`。對應 `app/assistant/llm/external.py`。

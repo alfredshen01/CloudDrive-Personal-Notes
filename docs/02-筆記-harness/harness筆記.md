@@ -144,7 +144,7 @@ workflow 執行維持串行，DAG 並行延後——所有技能共用同一 Asy
 ## 7/06：防跳針循環一、二（DEC-031／DEC-032）＋E7 量測
 
 - **現象**：某些請求（如「查剩餘容量」）讓模型陷入跳針（repetition loop，重複生成卡到 timeout）。
-- **定位**：結構化請求把 temperature 釘 0，gemma4 在 greedy decoding（貪婪解碼）下掉入決定性的 repetition loop，同 prompt 100% 重現。
+- **定位**：結構化請求把 temperature 釘 0，gemma4 在 greedy decoding 下掉入決定性的 repetition loop，同 prompt 100% 重現。
 - **循環一 DEC-031**：`num_predict` 生成上限（跳針變有界失敗）＋結構化請求用低而非零的溫度（微量隨機打破迴圈，格式仍由 grammar 保證）。驗證：原本卡死的整合測試 40/40 通過。
 - **循環二 DEC-032**：模型會規劃出不存在的技能名。把計畫 schema 的技能名做成 enum（依當下 registry 動態組）→ 幻覺技能在取樣層即不可生成。副發現：`validate_plan` 漏查 `depends_on` 非法相依，一併補上。這是「機制優先於模型自覺」的教科書例——不是求模型別亂編，是讓亂編文法上不可能。
 - **E7 首次量測**（4 案例 × 5 × 4 溫度）：首次量化確認**破壞性規劃是模型重災區**（0–40% 可靠度，跳針與幻覺技能並存）。過程中修了兩個量測工具 bug（token 過期假 401、後端提早退出未偵測）——量測工具本身也要驗。
