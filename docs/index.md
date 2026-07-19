@@ -54,5 +54,5 @@ CloudDrive AI 助理的架構、研究歷程與評測系統。
 CloudDrive 共用 repo 內、由隊友撰寫或混合著作的文件：
 
 - [eval-prompt-log](https://github.com/billwu101/CloudDrive/blob/main/doc/eval-prompt-log.md) — 測試 prompt 索引（billwu101 為主的混合著作）
-- [claudeAIChatHistory](https://github.com/billwu101/CloudDrive/blob/main/doc/claudeAIChatHistory.md) — claude.ai 對話摘要（作者：billwu101）
-- [demo-compress-skill](https://github.com/billwu101/CloudDrive/blob/main/doc/demo-compress-skill.md) — 壓縮 skill demo（作者：billwu101）
+- `claudeAIChatHistory.md` — claude.ai 對話摘要（作者：billwu101;此檔已不在源 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)）
+- `demo-compress-skill.md` — 壓縮 skill demo（作者：billwu101;此檔已不在源 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)）

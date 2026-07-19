@@ -1,7 +1,7 @@
 # CloudDrive In-App AI Assistant：Agent Harness 架構設計
 
 > 測試與數據詳見 [測試系統報告](測試系統報告.md)。
-> 底稿與細節出處（cloud_drive 共用 repo,內文的 `doc/*` 路徑皆指該 repo）：[harness-architecture.md](https://github.com/billwu101/CloudDrive/blob/main/doc/harness-architecture.md)、[detailed-design.md](https://github.com/billwu101/CloudDrive/blob/main/doc/detailed-design.md) §9、[decisions.md](https://github.com/billwu101/CloudDrive/blob/main/doc/decisions.md)。
+> 底稿與細節出處：cloud_drive 共用 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)（源 repo 仍在重組,故一律連到目錄層以免失效）。主要見 `detailed-design/03-architecture.md`（整體架構）、`detailed-design/08-assistant-engine.md`（assistant 引擎），決策見 `detailed-design/appendix-a-decisions.md`。
 > 圖以【圖 N】佔位標示（部分已以 Mermaid 呈現於網站版,正式圖檔另行產出,見文末「圖表清單」）。
 
 ---
@@ -50,7 +50,7 @@ flowchart TB
 
 > 說明：Workflow Pipeline 在最上、六元件 Runtime 在中、V（評測介面）
 > 畫在**旁側**（虛線箭頭指向系統,表示它是離線工具、不在請求路徑上）,最下為 Service 層 →
-> DB/Storage。此圖是全報告的核心主圖。原型圖見 [harness-architecture.md](https://github.com/billwu101/CloudDrive/blob/main/doc/harness-architecture.md) §5。
+> DB/Storage。此圖是全報告的核心主圖。原型圖見 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/03-architecture.md`。
 
 | 元件 | 職責 | 主要實作檔 |
 |---|---|---|
@@ -89,7 +89,7 @@ flowchart TD
 ```
 
 > 說明：確認節點分兩路：唯讀自動執行（fast-path）、寫入/破壞性走人工確認。
-> 對應 [detailed-design.md](https://github.com/billwu101/CloudDrive/blob/main/doc/detailed-design.md) §9.3。
+> 對應 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/08-assistant-engine.md`（Workflow 管線）。
 
 關鍵設計:
 - **結構化輸出（DEC-032）**：規劃階段用 json_schema grammar 約束,技能名以 enum 枚舉 →
@@ -106,7 +106,7 @@ flowchart TD
 > 說明：此圖為決策流程。使用者在每則訊息自行選擇要用哪個模型（本機模型,或自己設定的
 > 外部模型）;送出前先做隱私判斷,若內容敏感又無法去識別化,就不送到外部模型;選定的模型
 > 是這次唯一的執行者,不會自動改用別的模型;若失敗,回報可區分的錯誤原因（連不到模型、
-> 憑證被拒、用量額度耗盡）。對應 [harness-architecture.md](https://github.com/billwu101/CloudDrive/blob/main/doc/harness-architecture.md) §4。
+> 憑證被拒、用量額度耗盡）。對應 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/08-assistant-engine.md`（模型路由）。
 
 - **使用者每則訊息自選模型**：可選本機模型（gemma4:26b）,或使用者自己設定、加密儲存的
   外部模型連線（每位使用者各自一份）。選定後,這次就只用該模型執行,不會再換別的模型。
@@ -122,7 +122,7 @@ flowchart TD
 > 說明：此圖為資料流程。左路 `/chat`：載入最近數則歷史對話 → 併入規劃器的輸入 → 執行 →
 > 把結果摘要接回 assistant 訊息、存進資料庫;右路 `/confirm`：使用者手動確認後執行 →
 > 結果摘要一樣寫回該 session。圖中標出歷史則數上限,以及「工具執行結果以 assistant 文字
-> 形式帶入」。對應 [proposal-assistant-memory.md](https://github.com/billwu101/CloudDrive/blob/main/doc/proposal-assistant-memory.md)。
+> 形式帶入」。對應 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/08-assistant-engine.md` §8.14 對話記憶（原 `proposal-assistant-memory.md` 已於 2026-07-13 併入此處）。
 
 - **讀取歷史**：載入最近 `assistant_history_max_messages`（預設 12）則對話,依
   `[system, *歷史, 當前訊息]` 的順序送入模型。
@@ -140,7 +140,7 @@ flowchart TD
 【圖 3：技能生成子流程圖】
 > 說明：流程圖 codegen(結構化輸出產 skill) → codeguard(靜態安全檢查) → sandbox(隔離執行) →
 > approve(使用者核可) → execute → ingest(安裝回 registry)。標示「生成也是 workflow 化的前置子流程」。
-> 對應 [detailed-design.md](https://github.com/billwu101/CloudDrive/blob/main/doc/detailed-design.md) §9.93.1、DEC-019。
+> 對應 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/08-assistant-engine.md`（技能生成子流程）、`appendix-a-decisions.md` DEC-019。
 
 - codegen 以結構化輸出保證產出 `{name, description, version, code, ui}` 這組欄位（envelope）;其中 handler 與 version 由程式注入。
 - 生成碼經 codeguard 靜態檢查 + sandbox 隔離執行 + 使用者核可 + 稽核,才安裝。
@@ -189,8 +189,8 @@ flowchart TD
 
 | 編號 | 圖名 | 類型 | 資料/出處 |
 |---|---|---|---|
-| 圖 1 | Harness Runtime 六元件架構 | 分層方塊圖 | harness-architecture §5 |
-| 圖 2 | Workflow 執行管線 | 流程圖 | detailed-design §9.3 |
-| 圖 3 | 技能生成子流程 | 流程圖 | detailed-design §9.93.1 |
-| 圖 4 | 模型路由 + 外送隱私檢查 | 決策樹 | harness-architecture §4 |
-| 圖 5 | 對話記憶資料流 | 資料流/序列圖 | proposal-assistant-memory |
+| 圖 1 | Harness Runtime 六元件架構 | 分層方塊圖 | detailed-design/03-architecture.md |
+| 圖 2 | Workflow 執行管線 | 流程圖 | detailed-design/08-assistant-engine.md |
+| 圖 3 | 技能生成子流程 | 流程圖 | detailed-design/08-assistant-engine.md |
+| 圖 4 | 模型路由 + 外送隱私檢查 | 決策樹 | detailed-design/08-assistant-engine.md |
+| 圖 5 | 對話記憶資料流 | 資料流/序列圖 | detailed-design/08-assistant-engine.md §8.14 |
