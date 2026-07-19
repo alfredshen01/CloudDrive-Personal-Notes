@@ -1,7 +1,7 @@
 # Harness 架構：CloudDrive In-App AI Assistant 的 Agent Harness 設計
 
 > 這是本專案 Agent Harness 的架構正本。測試與數據見 [Harness 評測](Harness評測.md)。
-> 底稿與細節出處：cloud_drive 共用 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)（源 repo 仍在重組,故一律連到目錄層以免失效）。主要見 `detailed-design/03-architecture.md`（整體架構）、`detailed-design/08-assistant-engine.md`（assistant 引擎），決策見 `detailed-design/appendix-a-decisions.md`。
+> 底稿與細節出處：cloud_drive 共用 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)。主要見 `detailed-design/03-architecture.md`（整體架構）、`detailed-design/08-assistant-engine.md`（assistant 引擎），決策見 `detailed-design/appendix-a-decisions.md`。
 
 ---
 
