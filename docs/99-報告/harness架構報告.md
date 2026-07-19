@@ -147,7 +147,7 @@ flowchart TD
 | DEC-019 | 生成技能：核可 → 沙箱 → 稽核 |
 | DEC-020 | session/技能持久化到 DB |
 | DEC-029 | 失敗回覆由程式以執行結果組合（honest reporting）+ 有限重規劃,不採 agentic loop |
-| DEC-031 | 結構化解碼防跳針（num_predict + 非零溫度） |
+| DEC-031 | 結構化解碼防跳針（num_predict + 非零 temperature） |
 | DEC-032 | schema enum：幻覺技能 grammar 級不可生成 |
 | DEC-033 | planner 預設關 thinking（跳針治本、快 10×） |
 

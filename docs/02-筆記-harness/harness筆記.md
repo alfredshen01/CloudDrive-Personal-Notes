@@ -117,7 +117,7 @@ PostgreSQL + Storage Provider
 
 > **量化 → 定位根因 → 修正 → 再驗證**
 
-1. **真模型量測（temp_sweep）**：代表案例 × N 次 × 多溫度，量 pass rate／跳針率／延遲；機率性系統不看單次。
+1. **真模型量測（temp_sweep）**：代表案例 × N 次 × 多個 temperature，量 pass rate／跳針率／延遲；機率性系統不看單次。
 2. **A/B 對照**：疑似退化時起 baseline 版對打，拿基準再定位，不猜。
 3. **單元測試不足以驗 LLM**：單元裡 LLM 是 mock 的，全部通過只證明管線接得對，不證明真模型做得對。
 4. **全量 log 落檔再過濾**：診斷先完整記錄，不在管線裡先 tail／grep。
@@ -131,7 +131,7 @@ PostgreSQL + Storage Provider
 | 7/06 | 防跳針循環一、二 | DEC-031（結構化解碼）、DEC-032（enum）、temp_sweep＋E7 量測 |
 | 7/07 | 防跳針循環三＋記憶起步 | codegen 保護、DEC-033（think:false A/B）、記憶 v1、多輪 eval 起步 |
 | 7/08 | 記憶收尾＋eval 嚴謹化 | confirm 修復、多輪 eval（recall 0/5） |
-| 7/08–09 | recall 診斷閉環＋溫度再量測 | 依假設誤修 → 正確診斷雙缺陷 → 5/5；溫度假象釐清 |
+| 7/08–09 | recall 診斷閉環＋temperature 再量測 | 依假設誤修 → 正確診斷雙缺陷 → 5/5；temperature 假象釐清 |
 
 ## 6/17–6/20：建立測試基礎設施（eval harness）
 
@@ -145,9 +145,9 @@ workflow 執行維持串行，DAG 並行延後——所有技能共用同一 Asy
 
 - **現象**：某些請求（如「查剩餘容量」）讓模型陷入跳針（repetition loop，重複生成卡到 timeout）。
 - **定位**：結構化請求把 temperature 釘 0，gemma4 在 greedy decoding 下掉入決定性的 repetition loop，同 prompt 100% 重現。
-- **循環一 DEC-031**：`num_predict` 生成上限（跳針變有界失敗）＋結構化請求用低而非零的溫度（微量隨機打破迴圈，格式仍由 grammar 保證）。驗證：原本必逾時失敗的整合測試 40/40 通過。
+- **循環一 DEC-031**：`num_predict` 生成上限（跳針變有界失敗）＋結構化請求用低而非零的 temperature（微量隨機打破迴圈，格式仍由 grammar 保證）。驗證：原本必逾時失敗的整合測試 40/40 通過。
 - **循環二 DEC-032**：模型會規劃出不存在的技能名。把計畫 schema 的技能名做成 enum（依當下 registry 動態組）→ 幻覺技能在取樣層即不可生成。副發現：`validate_plan` 漏查 `depends_on` 非法相依，一併補上。這是「機制優先於模型自覺」的教科書例——不是求模型別亂編，是讓亂編文法上不可能。
-- **E7 首次量測**（4 案例 × 5 × 4 溫度）：首次量化確認**破壞性規劃是模型重災區**（0–40% 可靠度，跳針與幻覺技能並存）。過程中修了兩個量測工具 bug（token 過期假 401、後端提早退出未偵測）——量測工具本身也要驗。
+- **E7 首次量測**（4 案例 × 5 × 4 個 temperature）：首次量化確認**破壞性規劃是模型重災區**（0–40% 可靠度，跳針與幻覺技能並存）。過程中修了兩個量測工具 bug（token 過期假 401、後端提早退出未偵測）——量測工具本身也要驗。
 
 ## 7/07：防跳針循環三（DEC-033）＋codegen 保護
 
@@ -180,7 +180,7 @@ workflow 執行維持串行，DAG 並行延後——所有技能共用同一 Asy
 - **修復並驗證**：兩者皆修 → 端到端真模型驗證 → recall 0/5 → 5/5、三案例綜合 15/15。
 - **方法論收穫**：**憑讀碼向前推論、預設上游成功，是典型認知陷阱；印出 runtime 的真實診斷才是可信判準。**
 
-**同期：溫度再量測（釐清假象）**——乾淨重跑（think:false，4 溫 × 10）：四溫度全 100%、0 跳針；對照 thinking 開（4 溫 × 5）85–90% 且有跳針。先前看似的「溫度效應」其實是跳針傾向（低溫接近 greedy decoding，更易進入 repetition loop）；`structured_temperature=0.2` 的定位是「打破 repetition loop 的最小非零溫度」以求確定性，並非因高溫會失敗。
+**同期：temperature 再量測（釐清假象）**——乾淨重跑（think:false，4 個 temperature × 10）：四個 temperature 全 100%、0 跳針；對照 thinking 開（4 個 temperature × 5）85–90% 且有跳針。先前看似的「temperature 效應」其實是跳針傾向（低 temperature 接近 greedy decoding，更易進入 repetition loop）；`structured_temperature=0.2` 的定位是「打破 repetition loop 的最小非零 temperature」以求確定性，並非因高溫會失敗。
 
 ## 未解問題與未來方向
 
