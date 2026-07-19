@@ -56,16 +56,11 @@ nav:
       - W4 0707~0713: 01-日誌/W4-0707~0713.md
       - W5 0714~0720: 01-日誌/W5-0714~0720.md
   - 02 筆記 harness:
-      - harness 筆記: 02-筆記-harness/harness筆記.md
-      - eval 系統速覽: 02-筆記-harness/eval系統速覽.md
-      - V0.2 審查發現與測試現況: 02-筆記-harness/V02審查發現與測試現況.md
-      - openai-oauth-problem: 02-筆記-harness/openai-oauth-problem.md
+      - Harness 架構: 02-筆記-harness/Harness架構.md
+      - Harness 評測: 02-筆記-harness/Harness評測.md
   - 03 筆記 前後端:
       - 後端概念: 03-筆記-前後端/後端概念.md
       - 前端概念: 03-筆記-前後端/前端概念.md
       - 開發筆記精選: 03-筆記-前後端/開發筆記精選.md
   - 04 筆記 部署維運:
       - 部署與環境: 04-筆記-部署維運/部署與環境.md
-  - 99 報告:
-      - harness 架構報告: 99-報告/harness架構報告.md
-      - 測試系統報告: 99-報告/測試系統報告.md

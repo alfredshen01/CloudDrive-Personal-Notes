@@ -1,29 +1,32 @@
-# CloudDrive In-App AI Assistant：Agent Harness 架構設計
+# Harness 架構：CloudDrive In-App AI Assistant 的 Agent Harness 設計
 
-> 測試與數據詳見 [測試系統報告](測試系統報告.md)。
+> 這是本專案 Agent Harness 的架構正本。測試與數據見 [Harness 評測](Harness評測.md)。
 > 底稿與細節出處：cloud_drive 共用 repo 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)（源 repo 仍在重組,故一律連到目錄層以免失效）。主要見 `detailed-design/03-architecture.md`（整體架構）、`detailed-design/08-assistant-engine.md`（assistant 引擎），決策見 `detailed-design/appendix-a-decisions.md`。
-> 圖以【圖 N】佔位標示（部分已以 Mermaid 呈現於網站版,正式圖檔另行產出,見文末「圖表清單」）。
 
 ---
+
+## 0. 核心原則：機制優先於模型自覺（mechanism over model self-awareness）
+
+- **是什麼**：凡是能用「程式／規則／文法」保證的,就不要靠「模型記得要做對」。
+- **為什麼**：本專案用的是本地小模型 gemma4:26b,能力有限、輸出不穩定;與其要求它自我約束,不如把保證交給程式機制。
+- **關鍵洞察**：把要求從「請模型遵守」提升成「使其不可違反」。
+- **一句話記住**：模型的能力預算有限,只花在真正需要判斷的地方（規劃判斷）;其餘一律以機制保證。
+
+這條原則解釋了後面每一個設計決策——遇到問題先問：「這能用機制保證嗎?能就不靠模型。」
 
 ## 1. 目的與定位
 
 CloudDrive 是一套自架雲端硬碟,內嵌一個在本機運行、不連到雲端的 AI 助理（採用本地模型 gemma4:26b）,
-讓使用者以自然語言操作檔案（搜尋、整理、壓縮、還原等）。本文件說明助理背後的
+讓使用者以自然語言操作檔案（搜尋、整理、壓縮、還原等）。本文說明助理背後的
 **Agent Harness**——把一個語言模型包裝成可靠、可治理、可驗證的代理系統的架構。
 
-設計原則:**能用程式機制保證的事,就不交給模型自行判斷。** 輸出格式以 grammar（語法約束）
-保證、衍生欄位由程式計算、危險操作交給權限檢查、多輪記憶靠讀取歷史對話、輸出可靠性靠
-結構化解碼;模型只負責真正需要判斷的規劃決策。
-
-這樣設計的目的,是讓參數量不大的本地小模型也能穩定完成基本的檔案操作,不必依賴更大的雲端模型。
+設計目的,是讓參數量不大的本地小模型也能穩定完成基本的檔案操作,不必依賴更大的雲端模型。
 
 ## 2. 整體架構：六核心元件 ↔ 九實作模組
 
 本專案的 harness 對應到 agent 系統的六個通用核心元件（E/T/C/S/L/V）;在程式碼層,這六個元件
 再細分為九個實作模組。分成九個是為了讓各部分能獨立開發與測試,並不是另一套架構——**概念上
-分六層（報告採用）,程式碼上分九層（便於測試）**。（後文 `DEC-NNN` 為本專案的設計決策編號,
-完整清單見 §7。）
+分六層,程式碼上分九層（便於測試）**。（後文 `DEC-NNN` 為本專案的設計決策編號,完整清單見 §7。）
 
 【圖 1：Harness Runtime 六元件架構圖】
 
@@ -43,23 +46,23 @@ flowchart TB
     S["S State Store<br/>sessions・skills・workflows"]
     L["L Lifecycle Hooks 治理層<br/>permissions・codeguard・sandbox・外送隱私檢查"]
   end
-  V["V Evaluation Interface<br/>離線 eval harness（不在請求路徑上）"] -. "評測請求" .-> R
+  V["V Evaluation Interface<br/>離線評測 harness（不在請求路徑上）"] -. "評測請求" .-> R
   R --> SV["CloudDrive Service Layer（DEC-017）"]
   SV --> DB[("PostgreSQL + Storage")]
 ```
 
 > 說明：Workflow Pipeline 在最上、六元件 Runtime 在中、V（評測介面）
 > 畫在**旁側**（虛線箭頭指向系統,表示它是離線工具、不在請求路徑上）,最下為 Service 層 →
-> DB/Storage。此圖是全報告的核心主圖。原型圖見 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/03-architecture.md`。
+> DB/Storage。此為全篇的核心主圖。原型圖見 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)的 `detailed-design/03-architecture.md`。
 
-| 元件 | 職責 | 主要實作檔 |
+| 元件 | 職責（白話） | 主要實作檔 |
 |---|---|---|
 | **E** Execution Loop | 主迴圈：送訊息→解析→執行→回填;workflow 執行器管步驟相依/錯誤策略;可派生 bounded sub-agent;**模型介面（ModelRouter）亦歸此** | `service.py`、`workflow.py`、`subagent.py`、`llm/router.py` |
-| **T** Tool / Skill Registry | 內建、使用者自建、現場生成的技能來源;manifest 定義 schema/權限/handler | `skills/registry.py`、`skills/manifest.py`、`skills/authoring.py` |
-| **C** Context Manager | token 預算、裁切、工具輸出瘦身、技能清單注入、system prompt 組裝、**讀取歷史對話** | `context.py`、`planner.py`、`memory.py` |
-| **S** State Store | session/messages/skills/workflows 持久化,全依 `user_id` 隔離 | `repository.py` + migrations |
+| **T** Tool / Skill Registry | 有哪些技能可用（內建、使用者自建、現場生成）;manifest 定義 schema/權限/handler | `skills/registry.py`、`skills/manifest.py`、`skills/authoring.py` |
+| **C** Context Manager | 塞什麼進 prompt：token 預算、裁切、工具輸出瘦身、技能清單注入、system prompt 組裝、**讀取歷史對話** | `context.py`、`planner.py`、`memory.py` |
+| **S** State Store | 存什麼（session/訊息/技能/workflow）,全依 `user_id` 隔離 | `repository.py` + migrations |
 | **L** Lifecycle Hooks | 治理層攔截點;強制執行權限分層、核可、沙箱、稽核、**外送隱私檢查** | `hooks.py`、`permissions.py`、`codeguard.py`、`sandbox.py` |
-| **V** Evaluation Interface | 離線開發者工具：確定性斷言 + LLM judge + baseline 回歸,API/browser/exec 三模式 | `backend/eval/`（詳見 [測試系統報告](測試系統報告.md)） |
+| **V** Evaluation Interface | 離線開發者工具：確定性斷言 + LLM judge + baseline 回歸,API/browser/exec 三模式 | `backend/eval/`（詳見 [Harness 評測](Harness評測.md)） |
 
 **三個補充說明**：
 1. **V 不在請求路徑上**——它從外部呼叫 `/assistant/chat` 評測,圖上畫在旁側。
@@ -126,12 +129,12 @@ flowchart TD
 
 - **讀取歷史**：載入最近 `assistant_history_max_messages`（預設 12）則對話,依
   `[system, *歷史, 當前訊息]` 的順序送入模型。
-- **工具結果以 assistant 文字帶入（而非 tool 角色訊息）**：真實模型 A/B 對照顯示,gemma4
+- **工具結果以 assistant 文字帶入（而非 tool 角色訊息）**：真實模型對照實驗顯示,gemma4
   無法解讀單獨的 tool 角色訊息（tool 角色 0/4、assistant 文字 4/4）→ 此為決策依據,且不需資料庫 migration。
 - **確認後寫回**：`/confirm` 端點原本不寫入歷史 → 已修正為執行後把結果摘要寫回 session。
 - **目前限制**：只讀取最近約 6 輪對話,每則摘要截斷至 200 字,僅限單一 session,且以時間先後
-  （而非語意相關性）挑選訊息。多輪 eval 的 recall 案例 0/5 即揭露「摘要保真」的缺口
-  （詳見 [測試系統報告](測試系統報告.md) §4）。
+  （而非語意相關性）挑選訊息。多輪評測的 recall 案例 0/5 即揭露「摘要保真」的缺口
+  （詳見 [Harness 評測](Harness評測.md) 第二部）。
 
 ## 6. 技能生成與治理（自我撰寫技能）
 
@@ -147,7 +150,7 @@ flowchart TD
 
 ## 7. 設計原則沉澱（決策鏈）
 
-本專案的可靠性來自一連串**資料驅動的決策**,每個都有根因與驗證（[測試系統報告](測試系統報告.md) 詳述數據）:
+本專案的可靠性來自一連串**資料驅動的決策**,每個都有根因與驗證（[Harness 評測](Harness評測.md) 詳述數據）:
 
 | 決策 | 原則 |
 |---|---|
@@ -155,7 +158,7 @@ flowchart TD
 | DEC-019 | 生成技能：核可 → 沙箱 → 稽核 |
 | DEC-020 | session/技能持久化到 DB |
 | DEC-029 | 失敗回覆由程式依執行結果組合（如實回報）+ 有限度重規劃,不採 agentic loop |
-| DEC-031 | 結構化解碼防跳針（跳針:模型重複生成同一段內容且無法停止,詳見[測試系統報告](測試系統報告.md) §3;做法為 num_predict 生成上限 + 非零 temperature） |
+| DEC-031 | 結構化解碼防跳針（跳針:模型重複生成同一段內容且無法停止,詳見 [Harness 評測](Harness評測.md) 第一部;做法為 num_predict 生成上限 + 非零 temperature） |
 | DEC-032 | schema enum：幻覺技能 grammar 級不可生成 |
 | DEC-033 | planner 預設關閉 thinking（從根本消除跳針、速度快約 10 倍） |
 
@@ -173,7 +176,7 @@ flowchart TD
 
 **未來可行方向**
 - 工程可達成：斷線取消、記憶摘要格式修復、codegen 系統化跑分。
-- 模型能力前沿（只能持續改善、沒有一勞永逸的解）：對 planner 的寫入意圖做 prompt 工程,用多輪 eval 迭代。
+- 模型能力前沿（只能持續改善、沒有一勞永逸的解）：對 planner 的寫入意圖做 prompt 工程,用多輪評測迭代。
 - 記憶 v2：摘要壓縮 → 語意檢索（復用搜尋的 pgvector）→ 跨 session。
 
 ## 9. 文獻定位
@@ -181,11 +184,21 @@ flowchart TD
 本 harness 對應 agent 系統六核心元件的通用框架;本專案的特色在於
 **「本地小模型 + 以機制確保可靠性」**——用 grammar、num_predict、thinking 配置等機制,
 把一個 26B 參數的本地模型調校到可用的可靠度,而不依賴更大的雲端模型。
-（文獻筆記見 [harness筆記](../02-筆記-harness/harness筆記.md) 第一部 §6。）
+
+**相關研究對照——StraTA（arXiv 2605.06642）**：一種 Agentic 強化學習框架,先從任務初始狀態
+生成「精簡策略」,再以其為條件指導行動,分層聯訓策略生成與動作執行,提升長軌跡任務的探索與
+credit assignment（ALFWorld 93.1%／WebShop 84.2%／SciWorld 63.5%）。
+
+- **與本專案的關係**：解同一類問題（長程規劃可靠度,即 M3/M5 弱區）;「先抽象策略再執行」
+  與 Workflow 管線、「自我評判」與 validator＋repair loop 在設計原則上相似。
+- **為何不採用**：StraTA 是訓練期強化學習方法,需微調模型（獎勵訊號＋訓練基礎設施＋大量 GPU）;
+  本專案前提為凍結的本地 gemma4:26b（DEC-018）,26B 微調超出範圍。
+- **由此定位本專案**：模型端解法（訓練期）存在但成本不可行,故採 harness 層推理期補強
+  （約束解碼、驗證重試、確認閘）——這正是 harness 作為「LLM 與外部世界間可靠性基礎設施」的價值。
 
 ---
 
-## 附：本文件的圖表清單（待產出）
+## 附：圖表清單
 
 | 編號 | 圖名 | 類型 | 資料/出處 |
 |---|---|---|---|
