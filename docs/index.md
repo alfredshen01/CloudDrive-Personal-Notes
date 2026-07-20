@@ -43,7 +43,6 @@ CloudDrive AI 助理的架構與評測系統——本專案的兩份正本。
 
 - [後端概念](03-筆記-前後端/後端概念.md) — Alembic／pgvector／測試模式／執行稽核／JWT+bcrypt
 - [前端概念](03-筆記-前後端/前端概念.md) — React hooks／受控元件／CORS／Vite／CloudDrive 前端架構
-- [開發筆記精選](03-筆記-前後端/開發筆記精選.md) — 固定欄位式的可重用工程結論：結構化輸出／回報與授權／失敗隔離／temperature／registry 與沙盒／外部模型實測
 
 ## 04 筆記：部署維運
 
