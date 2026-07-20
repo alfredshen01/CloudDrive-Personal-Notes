@@ -44,7 +44,7 @@ flowchart TB
     T["T Tool / Skill Registry<br/>內建・自建・現場生成技能"]
     C["C Context Manager<br/>裁切・prompt 組裝・歷史回放"]
     S["S State Store<br/>sessions・skills・workflows"]
-    L["L Lifecycle Hooks 治理層<br/>permissions・codeguard・sandbox・外送隱私檢查"]
+    L["L Lifecycle Hooks 治理層<br/>permissions・codeguard・sandbox・送外部模型前的隱私檢查"]
   end
   V["V Evaluation Interface<br/>離線評測 harness（不在請求路徑上）"] -. "評測請求" .-> R
   R --> SV["CloudDrive Service Layer（DEC-017）"]
@@ -61,7 +61,7 @@ flowchart TB
 | **T** Tool / Skill Registry | 有哪些技能可用（內建、使用者自建、現場生成）;manifest 定義 schema/權限/handler | `skills/registry.py`、`skills/manifest.py`、`skills/authoring.py` |
 | **C** Context Manager | 塞什麼進 prompt：token 預算、裁切、工具輸出瘦身、技能清單注入、system prompt 組裝、**讀取歷史對話** | `context.py`、`planner.py`、`memory.py` |
 | **S** State Store | 存什麼（session/訊息/技能/workflow）,全依 `user_id` 隔離 | `repository.py` + migrations |
-| **L** Lifecycle Hooks | 治理層攔截點;強制執行權限分層、核可、沙箱、稽核、**外送隱私檢查** | `hooks.py`、`permissions.py`、`codeguard.py`、`sandbox.py` |
+| **L** Lifecycle Hooks | 治理層攔截點;強制執行權限分層、核可、沙箱、稽核、**送外部模型前的隱私檢查** | `hooks.py`、`permissions.py`、`codeguard.py`、`sandbox.py` |
 | **V** Evaluation Interface | 離線開發者工具：確定性斷言 + LLM judge + baseline 回歸,API/browser/exec 三模式 | `backend/eval/`（詳見 [Harness 評測](Harness評測.md)） |
 
 **三個補充說明**：
@@ -103,9 +103,9 @@ flowchart TD
 - **串行執行（DEC-030）**：並行（DAG,有向無環圖）延後,因所有技能共用同一個資料庫連線
   （AsyncSession）需先解決。
 
-## 4. 模型路由與外送隱私檢查
+## 4. 模型路由與送外部模型前的隱私檢查
 
-【圖 4：模型路由 + 外送隱私檢查決策流程圖】
+【圖 4：模型路由 + 送外部模型前的隱私檢查決策流程圖】
 > 說明：此圖為決策流程。使用者在每則訊息自行選擇要用哪個模型（本機模型,或自己設定的
 > 外部模型）;送出前先做隱私判斷,若內容敏感又無法去識別化,就不送到外部模型;選定的模型
 > 是這次唯一的執行者,不會自動改用別的模型;若失敗,回報可區分的錯誤原因（連不到模型、
@@ -113,7 +113,7 @@ flowchart TD
 
 - **使用者每則訊息自選模型**：可選本機模型（gemma4:26b）,或使用者自己設定、加密儲存的
   外部模型連線（每位使用者各自一份）。選定後,這次就只用該模型執行,不會再換別的模型。
-- **外送隱私檢查一律執行（DEC-023）**：即使使用者手動選擇外部模型,一旦偵測到敏感內容仍不會送出。
+- **送外部模型前的隱私檢查一律執行（DEC-023）**：即使使用者手動選擇外部模型,一旦偵測到敏感內容仍不會送出。
 - 舊版的「本地模型失敗就自動改用外部模型」已改為由使用者手動選擇,僅在 `target=None` 的相容路徑保留。
 
 ## 5. 對話記憶子系統（7 月新增）
@@ -205,5 +205,5 @@ credit assignment（ALFWorld 93.1%／WebShop 84.2%／SciWorld 63.5%）。
 | 圖 1 | Harness Runtime 六元件架構 | 分層方塊圖 | detailed-design/03-architecture.md |
 | 圖 2 | Workflow 執行管線 | 流程圖 | detailed-design/08-assistant-engine.md |
 | 圖 3 | 技能生成子流程 | 流程圖 | detailed-design/08-assistant-engine.md |
-| 圖 4 | 模型路由 + 外送隱私檢查 | 決策樹 | detailed-design/08-assistant-engine.md |
+| 圖 4 | 模型路由 + 送外部模型前的隱私檢查 | 決策樹 | detailed-design/08-assistant-engine.md |
 | 圖 5 | 對話記憶資料流 | 資料流/序列圖 | detailed-design/08-assistant-engine.md §8.14 |
