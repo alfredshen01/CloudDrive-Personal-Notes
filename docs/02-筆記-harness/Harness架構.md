@@ -60,7 +60,7 @@ flowchart TB
     S["S State Store<br/>sessions・skills・workflows"]
     L["L Lifecycle Hooks 治理層<br/>permissions・codeguard・sandbox・送外部模型前的隱私檢查"]
   end
-  V["V Evaluation Interface<br/>離線評測 harness（不在請求路徑上）"] -. "評測請求" .-> R
+  V["V Evaluation Interface<br/>離線 evaluation harness（不在請求路徑上）"] -. "評測請求" .-> R
   R --> SV["CloudDrive Service Layer（DEC-017）"]
   SV --> DB[("PostgreSQL + Storage")]
 ```
