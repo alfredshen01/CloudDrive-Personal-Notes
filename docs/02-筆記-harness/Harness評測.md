@@ -72,6 +72,11 @@ flowchart LR
   D -.回到量化.-> A
 ```
 
+- **評分模式要配合模型的確定性**——`steps_include` 有兩種判法:
+    - **精確步驟比對**:逐一比對計畫是否含每個預期步驟。只適合 **mock 模式**（計畫寫死、每次一樣）。
+    - **計畫層級評分**:只看有無產出合理計畫＋寫入操作的確認層級正確。適合**真模型**（輸出非確定性,合理計畫也會漏一步或換順序）。
+    - 真模型若誤用精確比對,會低估能力、分數還會隨測試資料狀態飄動（見 §7.3 發現一）。以 `run.py --no-strict-steps` 切換。
+
 ### 3. 名詞定義
 
 - **重複生成迴圈**：模型重複生成同一段內容且無法停止之現象（repetition loop）,以下沿用此稱。
@@ -97,6 +102,7 @@ flowchart LR
 | 7/07 | 防止重複生成循環三＋記憶起步 | codegen 保護、DEC-033（think:false 對照實驗）、記憶 v1、多輪評測起步 |
 | 7/08 | 記憶收尾＋評測嚴謹化 | confirm 修復、多輪評測（recall 0/5） |
 | 7/08–09 | recall 診斷閉環＋temperature 再量測 | 依假設誤修 → 正確診斷雙缺陷 → 5/5;temperature 假象釐清 |
+| 7/21–22 | 全案例驗收評測（測試線三） | 計畫層級評分方法學、DEC-034 codegen think:false、生成技能執行驗證、M2–M5 各級通過率 |
 
 ### 5. 測試線一：規劃可靠性（防止重複生成）
 
@@ -209,7 +215,7 @@ flowchart LR
   關閉 thinking（`think:false`）後,各 temperature 通過率一致為 100%,可見 temperature 不是正確率的直接因素。因此把
   `structured_temperature` 固定在 0.2（能打破重複迴圈的最小非零值）,讓輸出盡量穩定,
   而不是因為 temperature 高會失敗。
-- **模型能力上限**：雜訊清掉後,困難案例集 M3/M5 的通過率仍只有約 47%。（評測案例分為 M1–M5,
+- **模型能力上限**：雜訊清掉後,困難案例集 M3/M5 的通過率仍只有約 47%。（此為 7/07 該次實驗——調 planner prompt、困難集、think:false——的估計;全 400 案、計畫層級評分的權威數字見 §7.3:M3 41%、M5 2%,案例集與評分不同故不完全對應,以 §7.3 為準。）（評測案例分為 M1–M5,
   難度遞增;M3/M5 為最難的兩級：先以多個查詢工具蒐集脈絡,再執行一個寫入動作。）典型的失敗是
   「格式合法但語意錯」——漏掉使用者要的寫入步驟（規劃成唯讀）。這屬於模型能力的限制,沒辦法用機制解決：
   文法約束、確認閘、enum 這些機制能保證的是**形式**——輸出格式正確、危險操作要確認、技能名不亂編;
@@ -280,7 +286,151 @@ flowchart LR
 100%（15/15）、0 次重複生成迴圈。此結果印證「真實診斷才是可信的判準;憑讀程式碼向前推論、預設上游
 一定成功,是典型的認知陷阱」。
 
-### 7. 限制
+### 7. 測試線三：全案例驗收評測（真模型、計畫層級評分）
+
+#### 7.1 動機
+
+W10 的 V0.2 審查盤點出最大缺口是「驗收證據」——先前真模型只跑過個別案例,沒有一份**全案例、真模型**的評測報告當交付憑證。本週補上:對整套 400 案例（M2–M5）＋手寫代表案例＋技能執行案例,用真實模型跑完並保留每案成績為回歸基準。
+
+#### 7.2 怎麼做
+
+- **後端**:助理後端接遠端 `gemma4:26b`（Ollama 原生 `/api/chat`）,資料庫用隔離的 `clouddrive_test`（避免污染正式資料）,並種入 3 個資料夾＋12 個文本檔（讓依賴既有檔案的案例有操作目標）。
+- **規模**:400 案 × 每案 5 次（機率性系統取通過率,不看單次）。
+- **評分**:改用計畫層級評分（見 §2.4）——真模型計畫非確定性,逐步精確比對是給 mock 用的;改為「有產出合理計畫＋寫入操作的確認層級正確」即通過。
+- **分層**:規劃（api 模式）＋預寫技能執行（exec 模式）＋生成技能執行（沙箱跑模型生成的程式碼）＋瀏覽器端到端（真 UI 抽樣）。
+- **穩定性**:本地模型一次只處理一個請求,連續大量評測時偶爾忙不過來、讓部分批次整批失敗;評測工具加上「失敗自動重試」後把失敗批次補齊（此忙碌行為屬既有技術債）。
+
+#### 7.3 結果
+
+| 面向 | 通過率 | 判讀 |
+|---|---|---|
+| M2 唯讀多工具規劃 | 100% | 穩 |
+| M4 技能生成 | 100% | think:false 修法後（DEC-034） |
+| 生成技能執行（沙箱驗產出） | 96% | 生成的技能真的能用 |
+| 瀏覽器端到端（抽樣） | 71% | 斷言較寬 |
+| M3 查詢脈絡＋寫入 | 41% | 中等 |
+| M5 多步＋步驟間引用＋寫入 | 2% | 長任務規劃弱項 |
+
+**圖表 7:通過率隨規劃難度陡降**（計畫層級評分、每案 5 次、全 400 案）
+
+<div class="eval-viz">
+<style>
+.eval-viz { max-width: 560px; --s1: #2a78d6; --s2: #008300; }
+[data-md-color-scheme="slate"] .eval-viz { --s1: #3987e5; --s2: #008300; }
+.eval-viz text { font-size: 12px; fill: var(--md-default-fg-color--light); }
+.eval-viz .tick { font-size: 11px; }
+</style>
+<svg viewBox="0 0 560 302" role="img" aria-label="通過率隨規劃難度折線圖：M2 100%、M3 41%、M5 2%" style="width:100%;height:auto;display:block;">
+  <circle cx="52" cy="14" r="5" fill="var(--s2)"/>
+  <text x="62" y="18">計畫層級評分（每案 5 次）</text>
+  <g stroke="var(--md-default-fg-color--lightest)" stroke-width="1">
+    <line x1="46" y1="36" x2="515" y2="36"/>
+    <line x1="46" y1="90" x2="515" y2="90"/>
+    <line x1="46" y1="144" x2="515" y2="144"/>
+    <line x1="46" y1="198" x2="515" y2="198"/>
+  </g>
+  <line x1="46" y1="252" x2="515" y2="252" stroke="var(--md-default-fg-color--lighter)" stroke-width="1"/>
+  <g class="tick" text-anchor="end">
+    <text x="40" y="40">100%</text>
+    <text x="40" y="94">75%</text>
+    <text x="40" y="148">50%</text>
+    <text x="40" y="202">25%</text>
+    <text x="40" y="256">0%</text>
+  </g>
+  <g class="tick" text-anchor="middle">
+    <text x="110" y="274">M2 唯讀</text>
+    <text x="285" y="274">M3 查詢+寫入</text>
+    <text x="460" y="274">M5 多步+引用</text>
+    <text x="285" y="296">規劃難度遞增 →</text>
+  </g>
+  <polyline points="110,36 285,163.4 460,247.7" fill="none" stroke="var(--s2)" stroke-width="2"/>
+  <g fill="var(--s2)" stroke="var(--md-default-bg-color)" stroke-width="2">
+    <circle cx="110" cy="36" r="4.5"><title>M2 唯讀多工具：100%</title></circle>
+    <circle cx="285" cy="163.4" r="4.5"><title>M3 查詢脈絡+寫入：41%</title></circle>
+    <circle cx="460" cy="247.7" r="4.5"><title>M5 多步+步驟引用+寫入：2%</title></circle>
+  </g>
+  <g class="tick">
+    <text x="120" y="32">100%</text>
+    <text x="295" y="160">41%</text>
+    <text x="470" y="244">2%</text>
+  </g>
+</svg>
+</div>
+
+> M4 技能生成為 100%,屬生成類、不在此規劃難度軸上。
+
+**圖表 8:同一批模型輸出、換評分模式的通過率差異**（種子庫、每級 20 案）
+
+<div class="eval-viz">
+<style>
+.eval-viz { max-width: 560px; --s1: #2a78d6; --s2: #008300; }
+[data-md-color-scheme="slate"] .eval-viz { --s1: #3987e5; --s2: #008300; }
+.eval-viz text { font-size: 12px; fill: var(--md-default-fg-color--light); }
+.eval-viz .tick { font-size: 11px; }
+</style>
+<svg viewBox="0 0 560 302" role="img" aria-label="嚴格比對與計畫層級評分對照折線圖" style="width:100%;height:auto;display:block;">
+  <circle cx="52" cy="14" r="5" fill="var(--s1)"/>
+  <text x="62" y="18">嚴格精確比對</text>
+  <circle cx="200" cy="14" r="5" fill="var(--s2)"/>
+  <text x="210" y="18">計畫層級評分</text>
+  <g stroke="var(--md-default-fg-color--lightest)" stroke-width="1">
+    <line x1="46" y1="36" x2="515" y2="36"/>
+    <line x1="46" y1="90" x2="515" y2="90"/>
+    <line x1="46" y1="144" x2="515" y2="144"/>
+    <line x1="46" y1="198" x2="515" y2="198"/>
+  </g>
+  <line x1="46" y1="252" x2="515" y2="252" stroke="var(--md-default-fg-color--lighter)" stroke-width="1"/>
+  <g class="tick" text-anchor="end">
+    <text x="40" y="40">100%</text>
+    <text x="40" y="94">75%</text>
+    <text x="40" y="148">50%</text>
+    <text x="40" y="202">25%</text>
+    <text x="40" y="256">0%</text>
+  </g>
+  <g class="tick" text-anchor="middle">
+    <text x="110" y="274">M2</text>
+    <text x="285" y="274">M3</text>
+    <text x="460" y="274">M5</text>
+    <text x="285" y="296">規劃難度遞增 →</text>
+  </g>
+  <polyline points="110,144 285,241.2 460,252" fill="none" stroke="var(--s1)" stroke-width="2"/>
+  <polyline points="110,36 285,165.6 460,230.4" fill="none" stroke="var(--s2)" stroke-width="2"/>
+  <g fill="var(--s1)" stroke="var(--md-default-bg-color)" stroke-width="2">
+    <circle cx="110" cy="144" r="4.5"><title>M2 嚴格比對：50%</title></circle>
+    <circle cx="285" cy="241.2" r="4.5"><title>M3 嚴格比對：5%</title></circle>
+    <circle cx="460" cy="252" r="4.5"><title>M5 嚴格比對：0%</title></circle>
+  </g>
+  <g fill="var(--s2)" stroke="var(--md-default-bg-color)" stroke-width="2">
+    <circle cx="110" cy="36" r="4.5"><title>M2 計畫層級：100%</title></circle>
+    <circle cx="285" cy="165.6" r="4.5"><title>M3 計畫層級：40%</title></circle>
+    <circle cx="460" cy="230.4" r="4.5"><title>M5 計畫層級：10%</title></circle>
+  </g>
+</svg>
+</div>
+
+三個關鍵發現:
+
+**發現一:低分主因是評分模式套錯,不是模型不會。**
+
+- 第一版（嚴格精確比對＋單次）:M2 80／38%、M3 4–6%、M5 0%。
+- 改計畫層級評分＋每案 5 次:M2 100%、M3 41%、M5 2%。
+- 鐵證:對**同一批模型輸出**只換評分模式,M3 由 5% 升到 40%（圖表 8）——差距全來自評分方式。
+
+**發現二:技能生成的根因。**
+
+- 生成程式碼的路徑沒有關閉模型的「思考階段」,在本地模型上掉入重複輸出迴圈。
+- 對照實驗:關閉前後 0/6 → 6/6;規模上 M4 由 0% → 100%。記為 DEC-034（翻案 DEC-033「codegen 不連動」）。
+
+**發現三:生成技能的執行盲區。**
+
+- 生成的技能通過所有靜態檢查,卻可能一執行就用錯函式庫方法（API 幻覺）。
+- 新增「沙箱真跑、比對產出」一層（96%）,補上「靜態通過≠真能用」的洞。
+
+#### 7.4 模型能力上限（收斂 §5.4）
+
+控制掉評分與資料變數後,M5 仍只有 2%——長任務規劃（多個步驟、後面步驟要引用前面步驟的結果）是這個本地模型的真實極限。機制（文法約束／確認閘）保得了形式、保不了「讀懂一個長任務裡的每個步驟」,只能靠更強的模型或把任務拆小。
+
+### 8. 限制
 
 - **單一模型／單一 GPU**：結論綁定於 gemma4:26b,更換模型須重新量測。
 - **樣本數**：部分 sweep 之樣本數為 5–10,通過率反映趨勢而非精確值。
@@ -289,14 +439,14 @@ flowchart LR
 - **考官變異與判定分工**：本篇所有通過率皆由確定性驗證器判定,非由考官打分;考官具主觀性,
   故其定位為輔助之質性評估。
 
-### 8. 未來方向
+### 9. 未來方向
 
 - **擴充案例**：增加指涉型案例與執行次數以提升解析度。
 - **考官升級**：將 judge 更換為能力更強之 provider（E6 已具備此設計）以降低變異。
 - **量測前沿問題**：以多輪評測當工具,反覆調整 planner 對寫入意圖的 prompt,嘗試把 M3/M5
   的 47% 上限往上推。
 
-### 9. 研究反思
+### 10. 研究反思
 
 最大的認知風險不是「不會做」,而是「以為驗證過了」。兩週內至少三次出現「全部通過」,但真實
 模型實測或真實使用卻發現問題。對策不是寫更多同源測試（它們有一樣的盲點）,而是引入不同源的
@@ -340,6 +490,9 @@ flowchart LR
 | 多輪記憶（2 案例,10/10） | §6.4 | `temp_sweep_20260707T173641Z.md` |
 | 多輪記憶（3 案例,recall 0/5） | §6.4 | `temp_sweep_20260708T034239Z.md` |
 | 多輪記憶（recall 修復後,5/5） | §6.4 | `temp_sweep_20260709T011132Z.md` |
+| 全案例驗收（第一版:嚴格、單次） | §7.3 | `acceptance-2026-07-21/`（SUMMARY＋各級 baseline＋FINDINGS.md） |
+| 全案例驗收（計畫層級、每案 5 次） | §7.3 | `acceptance-runs5-nonstrict/`（SUMMARY＋級別彙總＋RERUN.md） |
+| 生成技能執行探針（沙箱） | §7.3 | `acceptance-runs5-nonstrict/gen-exec/log.md` |
 
 > 註：`eval/out/` 為 gitignored 之原始輸出;各檔含逐樣本明細與彙總表。相關決策與完整實驗
 > 記錄見 cloud_drive 的 [`doc/` 目錄](https://github.com/billwu101/CloudDrive/tree/main/doc)——`detailed-design/appendix-a-decisions.md`（DEC-031~033）與 `tasks/assistant-eval.md`（E1–E8）。
